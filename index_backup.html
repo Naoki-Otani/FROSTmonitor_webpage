@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>NINJA FROST monitor page</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Optional: auto-refresh the whole page every 5 minutes -->
+  <meta http-equiv="refresh" content="300">
+  <style>
+    :root {
+      --ok: #0ac70a;
+      --warn: #d40000;
+      --banner-ok-bg: #0b7a0b;
+      --banner-warn-bg: #990000;
+      --banner-fg: #ffffff;
+    }
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      color:#000; background:#fff; margin: 2rem 3rem;
+    }
+    h1 { font-size: 2.2rem; margin-bottom: 0.2rem; }
+    h2 { font-size: 1.6rem; margin: 0.8rem 0 0.4rem; }
+    hr { border:0; border-top:4px solid #000; margin:1rem 0; }
+    table { border-collapse: collapse; font-size: 1rem; min-width: 420px; margin-bottom: 1rem; }
+    caption { text-align:left; font-weight:700; font-size:1.1rem; margin: 0.5rem 0; }
+    td, th { border: 2px solid #000; padding: 0.4rem 0.6rem; }
+    th { background: #f0f0f0; text-align:left; }
+    .note { font-size: 1rem; }
+    .lamp {
+      width: 26px; height: 26px; border-radius: 50%;
+      display:inline-block; margin-left:10px; vertical-align:middle;
+      box-shadow: 0 0 10px rgba(0,0,0,0.4);
+      border: 2px solid #222;
+    }
+    .green { background-color: var(--ok); }
+    .red { background-color: var(--warn); }
+
+    /* Unified status banner (same place, different styles) */
+    #status-banner {
+      position: sticky; top: 0; z-index: 1000;
+      display: block;
+      color: var(--banner-fg);
+      padding: 0.6rem 1rem; font-weight: 700; letter-spacing: 0.3px;
+      border-radius: 8px; margin-bottom: 1rem; text-align: center;
+      box-shadow: 0 6px 16px rgba(0,0,0,0.25);
+    }
+    #status-banner.ok {
+      background: var(--banner-ok-bg);
+    }
+    #status-banner.warn {
+      background: var(--banner-warn-bg);
+      animation: blink 1.2s steps(2, start) infinite;
+    }
+    @keyframes blink { 50% { opacity: 0.2; } }
+
+    /* Enable sound bar (shown until user clicks) */
+    #enable-bar {
+      position: sticky; top: 0; z-index: 1001;
+      background: #f7f7f7; border: 1px solid #bbb; border-radius: 8px;
+      padding: 8px 12px; margin-bottom: 10px; display: none;
+      box-shadow: 0 6px 16px rgba(0,0,0,0.15);
+    }
+    #enable-sound {
+      padding: 6px 12px; border: 1px solid #333; border-radius: 6px;
+      background:#f5f5f5; cursor:pointer; font-weight:600; margin-left: 8px;
+    }
+    @keyframes pulse { 0%{transform:scale(1)} 50%{transform:scale(1.03)} 100%{transform:scale(1)} }
+  </style>
+</head>
+<body>
+  <!-- Unified status banner -->
+  <div id="status-banner" class="ok" role="status" aria-live="polite">
+    ✅ All good: data updated within the last 10 minutes.
+  </div>
+
+  <!-- Sound enable prompt (shown until user enables) -->
+  <div id="enable-bar">
+    🔊 To allow alarms to play automatically, please click:
+    <button id="enable-sound">Enable sound (click once)</button>
+  </div>
+
+  <hr>
+  <h1><strong>NINJA FROST monitor page</strong></h1>
+  <hr>
+
+  <h2><strong>Status of data acquisition for the FROST detector in NINJA physics run c (E71c)</strong></h2>
+  <p class="note">These results are updated automatically.</p>
+
+  <table>
+    <caption>Latest dat file</caption>
+    <tr>
+      <th scope="row">Current run</th>
+      <td id="run-cell">Loading...</td>
+    </tr>
+    <tr>
+      <th scope="row">Last modified time of the latest dat file</th>
+      <td id="date-cell">Loading...</td>
+    </tr>
+  </table>
+
+  <h3>Status Lamp:
+    <span id="lamp" class="lamp green" aria-label="status lamp"></span>
+  </h3>
+
+  <!-- Local buzzer sound -->
+  <audio id="beep-sound" preload="auto">
+    <source src="se_amb01.wav" type="audio/wav">
+  </audio>
+
+  <script>
+    // ===== Settings =====
+    const THRESHOLD_MINUTES = 10;
+    const RUN_JS  = "latestdat_run.js";
+    const DATE_JS = "latestdat_date.js";
+
+    let soundEnabled = false;
+
+    // Extracts value from: document.write("VALUE");
+    function extractWriteValue(jsText) {
+      const m = jsText.match(/document\.write\(\s*"([^"]*)"\s*\)\s*;?/);
+      return m ? m[1] : null;
+    }
+
+    // Strategy A: fetch as text (bypass cache) and extract
+    async function fetchValueFromJs(jsPath) {
+      const url = jsPath + "?cb=" + Date.now();
+      const res = await fetch(url, { cache: "no-store" });
+      if (!res.ok) throw new Error("Fetch failed: " + jsPath);
+      const text = await res.text();
+      return extractWriteValue(text);
+    }
+
+    // Strategy B: override document.write and load <script src="...">
+    function injectScriptAndCapture(jsPath) {
+      return new Promise((resolve, reject) => {
+        const originalWrite = document.write;
+        let captured = "";
+        document.write = (s) => { captured += String(s); };
+
+        const cleanup = () => { document.write = originalWrite; };
+        const done = () => {
+          cleanup();
+          captured ? resolve(captured) : reject(new Error("No output captured: " + jsPath));
+        };
+
+        const script = document.createElement("script");
+        script.src = jsPath + "?cb=" + Date.now();
+        script.onload = done;
+        script.onerror = () => { cleanup(); reject(new Error("Script load error: " + jsPath)); };
+
+        document.body.appendChild(script);
+        setTimeout(done, 3000); // safety timeout
+      });
+    }
+
+    function toDateJST(str) {
+      // Expect "YYYY/MM/DD HH:MM"
+      const m = str && str.match(/^(\d{4})\/(\d{2})\/(\d{2})\s+(\d{2}):(\d{2})$/);
+      if (!m) return null;
+      const [_, y, mo, d, hh, mm] = m;
+      return new Date(`${y}-${mo}-${d}T${hh}:${mm}:00+09:00`); // explicit JST
+    }
+
+    function setLamp(isOk) {
+      const lamp = document.getElementById('lamp');
+      lamp.classList.toggle('green', isOk);
+      lamp.classList.toggle('red', !isOk);
+    }
+
+    // Unified banner: set text + style (ok/warn)
+    function setStatusBanner(isOk) {
+      const banner = document.getElementById('status-banner');
+      if (!banner) return;
+      banner.classList.toggle('ok', isOk);
+      banner.classList.toggle('warn', !isOk);
+      banner.textContent = isOk
+        ? "✅ All good: data updated within the last 10 minutes."
+        : "⚠️ Warning: data not updated for more than 10 minutes!";
+      // Accessibility: announce changes assertively when warning
+      banner.setAttribute('role', isOk ? 'status' : 'alert');
+      banner.setAttribute('aria-live', isOk ? 'polite' : 'assertive');
+    }
+
+    async function startOrStopAlarm(shouldStart) {
+      const beep = document.getElementById('beep-sound');
+      if (shouldStart) {
+        if (!soundEnabled) {
+          // Prompt until user enables sound
+          const bar = document.getElementById('enable-bar');
+          const btn = document.getElementById('enable-sound');
+          if (bar) bar.style.display = 'block';
+          if (btn) {
+            btn.style.boxShadow = '0 0 0 3px rgba(255,0,0,0.35)';
+            btn.style.animation = 'pulse 1.5s infinite';
+          }
+          return;
+        }
+        try {
+          beep.loop = true;
+          await beep.play();
+        } catch {
+          setTimeout(() => startOrStopAlarm(true), 5000);
+        }
+      } else {
+        beep.pause();
+        beep.currentTime = 0;
+        beep.loop = false;
+      }
+    }
+
+    async function loadRunAndDate() {
+      const runCell  = document.getElementById('run-cell');
+      const dateCell = document.getElementById('date-cell');
+      let runVal = null, dateVal = null;
+
+      // Try fetch first
+      try {
+        [runVal, dateVal] = await Promise.all([
+          fetchValueFromJs(RUN_JS),
+          fetchValueFromJs(DATE_JS),
+        ]);
+      } catch {}
+
+      // Fallback via script injection if needed
+      if (!runVal)  { try { runVal  = await injectScriptAndCapture(RUN_JS);  } catch {} }
+      if (!dateVal) { try { dateVal = await injectScriptAndCapture(DATE_JS); } catch {} }
+
+      if (runVal)  runCell.textContent  = runVal;
+      if (dateVal) dateCell.textContent = dateVal;
+
+      return { runVal, dateVal };
+    }
+
+    async function evaluateStatusAndAlarm() {
+      try {
+        const { dateVal } = await loadRunAndDate();
+
+        if (!dateVal) {
+          setLamp(false); setStatusBanner(false); startOrStopAlarm(true);
+          return;
+        }
+
+        const latest = toDateJST(dateVal);
+        if (!latest) {
+          setLamp(false); setStatusBanner(false); startOrStopAlarm(true);
+          return;
+        }
+
+        const now = new Date();
+        const diffMinutes = (now - latest) / 60000;
+        const isOk = diffMinutes <= THRESHOLD_MINUTES;
+
+        setLamp(isOk);
+        setStatusBanner(isOk);
+        startOrStopAlarm(!isOk);
+      } catch {
+        setLamp(false); setStatusBanner(false); startOrStopAlarm(true);
+      }
+    }
+
+    // One-time sound permission
+    (function setupEnableSound() {
+      const bar  = document.getElementById('enable-bar');
+      const btn  = document.getElementById('enable-sound');
+      const beep = document.getElementById('beep-sound');
+
+      // Show the bar at page load so user can click once
+      if (bar) bar.style.display = 'block';
+
+      if (!btn) return;
+      btn.addEventListener('click', async () => {
+        try {
+          // tiny test playback to unlock audio
+          beep.volume = 0.01;
+          beep.loop = false;
+          await beep.play();
+          await new Promise(r => setTimeout(r, 150));
+          beep.pause();
+          beep.currentTime = 0;
+          beep.volume = 1.0;
+
+          soundEnabled = true;
+          if (bar) bar.style.display = 'none';
+
+          // If already red, start immediately
+          evaluateStatusAndAlarm();
+        } catch (e) {
+          alert("Autoplay blocked. Please click the button again or check site permissions for sound.");
+        }
+      });
+    })();
+
+    // Initial load + periodic re-check (and also on tab focus)
+    window.addEventListener('load', () => {
+      evaluateStatusAndAlarm();
+      setInterval(evaluateStatusAndAlarm, 30000); // every 30s
+    });
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) evaluateStatusAndAlarm();
+    });
+  </script>
+</body>
+</html>
