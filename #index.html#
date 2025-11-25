@@ -334,10 +334,9 @@
       if (!banner) return;
       banner.classList.toggle('ok', isOk);
       banner.classList.toggle('warn', !isOk);
-      banner.textContent = isOk        
-        ? "✅ All good: data updated within the last 30 minutes."
+      banner.textContent = isOk        ? "✅ All good: data updated within the last 30 minutes."
         : "⚠️ Warning: data not updated for more than 30 minutes!";
-      banner.setAttribute('role', isOk ? 'status' : 'alert');
+  nner.setAttribute('role', isOk ? 'status' : 'alert');
       banner.setAttribute('aria-live', isOk ? 'polite' : 'assertive');
     }
 
