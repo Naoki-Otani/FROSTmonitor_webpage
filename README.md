@@ -21,7 +21,7 @@ All updates happen via JavaScript using `fetch` and timers. The page itself does
 - The status threshold is defined in minutes:
 
   ```js
-  const THRESHOLD_MINUTES = 15;
+  const THRESHOLD_MINUTES = 30;
   ```
 
 - The latest timestamp is obtained from:
@@ -37,8 +37,8 @@ All updates happen via JavaScript using `fetch` and timers. The page itself does
   ```
 
 - The function `evaluateStatusAndAlarm()` compares the current browser time to this timestamp.
-  - If the difference is **≤ 15 minutes**, the status is **OK** (green lamp, green banner, no alarm).
-  - If the difference is **> 15 minutes**, the status is **warning** (red lamp, red blinking banner, alarm sound).
+  - If the difference is **<= 30 minutes**, the status is **OK** (green lamp, green banner, no alarm).
+  - If the difference is **> 30 minutes**, the status is **warning** (red lamp, red blinking banner, alarm sound).
 
 ### Latest Run
 
@@ -150,7 +150,7 @@ figs/
   dataquality_withBSD/
     pot_info/*.js
     pot_plot/accumulated_pot_withBSD.png
-    eventrate_plot/eventrate_plot.png
+    eventrate_plot/eventrate_plot_spill.png
 se_amb01.wav                 # alarm sound
 ```
 

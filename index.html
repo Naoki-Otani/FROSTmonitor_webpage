@@ -21,7 +21,7 @@
     h2 { font-size: 1.6rem; margin: 0.8rem 0 0.4rem; }
     hr { border:0; border-top:4px solid #000; margin:1rem 0; }
     table { border-collapse: collapse; font-size: 1rem; min-width: 420px; margin-bottom: 1rem; }
-    caption { text-align:left; font-weight:700; font-size:1.1rem; margin: 0.5rem 0; }
+    caption { text-align:left; font-weight:700; font-size:1.1rem; margin: 0.5rem 0; white-space: nowrap; }
     td, th { border: 2px solid #000; padding: 0.4rem 0.6rem; }
     th { background: #f0f0f0; text-align:left; }
     .note { font-size: 1rem; }
@@ -86,7 +86,7 @@
   <p class="note">These results are updated automatically.</p>
 
   <table>
-    <caption>Latest dat file</caption>
+    <caption><h2>Latest dat file</h2></caption>
     <tr>
       <th scope="row">Current run</th>
       <td id="run-cell">Loading...</td>
@@ -97,13 +97,21 @@
     </tr>
   </table>
 
-  <h3>Status Lamp:
+  <h2>Status Lamp:
     <span id="lamp" class="lamp green" aria-label="status lamp"></span>
-  </h3>
+  </h2>
+  <div class="status-lamp-description">
+   <p>Note: Interpretation of Status Lamp:</p>
+   <ul>
+     <li>Green: normal condition</li>
+     <li>Red: the difference between the “last modified time of the latest dat file” and the current time exceeds 30 minutes</li>
+   </ul>
+  </div>
 
  <!-- ===================== (1) Data set table ===================== -->
   <table>
-    <caption>Data set for accumulated POT</caption>
+    <caption><h2>Data set for accumulated POT and Event rate stability</h2>
+    </caption>
     <tr>
       <th scope="row">Period</th>
       <td><script src="figs/dataquality_withBSD/pot_info/period.js"></script></td>
@@ -129,19 +137,21 @@
       <td><script src="figs/dataquality_withBSD/pot_info/efficiency.js"></script></td>
     </tr>
   </table>
+  <p class="note">Note: QSD (Quick Summary Data) without good spill selection is used.</p>
 
   <!-- ===================== (2) Accumulated POT plot　===================== -->
   <h2>Accumulated POT</h2>
   <img
-     src="figs/dataquality_withBSD/pot_plot/accumulated_pot_withBSD.png"
+     src="figs/dataquality_withBSD/pot_plot/accumulated_pot_withBSD.png" 
      alt="Accumulated POT"
      class="img-left"
      style="width:60%; max-width:100%;">
 
   <!-- ===================== (3) Event rate / sand muon rate stability ===================== -->
   <h2>Event rate (or sand muon rate) stability</h2>
+  <p class="note"> An "event" is defined as a spill in which at least one channel records a light yield of ≥10 p.e.</p>
   <img
-    src="figs/dataquality_withBSD/eventrate_plot/eventrate_plot.png"
+    src="figs/dataquality_withBSD/eventrate_plot/eventrate_plot_spill.png"
     alt="Event rate (or sand muon rate) stability"
     style="width:60%; max-width:100%; display:block; margin-left:0;">
 
@@ -165,7 +175,7 @@
 
 
   <h3>3. TDC</h3>
-  <p class="note">The following four plots are shown for the latest run: leading, trailing, leading_fromadc, trailing_fromadc.</p>
+  <!-- <p class="note">The following four plots are shown for the latest run: leading, trailing, leading_fromadc, trailing_fromadc.</p> -->
   <img
     id="plot-tdc-leading"
     src=""
@@ -236,7 +246,7 @@
       style="width:60%; max-width:100%; display:block; margin-left:0;">
 
     <h3>3. TDC (previous run)</h3>
-    <p class="note">The following four plots are shown for the previous run: leading, trailing, leading_fromadc, trailing_fromadc.</p>
+    <!-- <p class="note">The following four plots are shown for the previous run: leading, trailing, leading_fromadc, trailing_fromadc.</p> -->
     <img
       id="prev-plot-tdc-leading"
       src=""
